@@ -6,16 +6,19 @@
 
 [![ko-fi](https://storage.ko-fi.com/cdn/brandasset/v2/support_me_on_kofi_beige.png)](https://ko-fi.com/B0B01E8SY7)
 
-**Ride the shell locally, with shared command history scoped to your workspace.**
+[![vscode](https://cdn.vsassets.io/v/M255_20250415.1/_content/Header/vs-logo.png)](https://marketplace.visualstudio.com/items?itemName=JetLogic.workspace-local-terminal)
 
-This extension sets up a terminal in Visual Studio Code that uses a workspace-specific history file, keeping your shell history clean, relevant, and project-specific.
+**Ride the shell locally, with shared initialization and history file scoped to your workspace.**
+
+This extension sets up a terminal in Visual Studio Code that uses a workspace-specific initialization and history file, keeping your shell history clean, relevant, and project-specific.
 
 ---
 
 ## ✨ Features
 
-- 📁 **Workspace-local terminal** with its own history file.
+- 📁 **Workspace-local terminal** with its own history and initialization file.
 - 🧠 Shared history across terminal sessions within the same workspace.
+- 🧠 Store your configurations in a separate rcfile to avoid modifying the default, enabling custom environment variables and init commands.
 - ⚙️ Easy setup via command: `Setup Workspace Local Terminal`.
 - 🐚 Shell compatibility: works with `bash`, `zsh`, `fish`.
 
@@ -27,8 +30,9 @@ This extension sets up a terminal in Visual Studio Code that uses a workspace-sp
 2. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`).
 3. Run: **`Setup Workspace Local Terminal`**
 4. That’s it! You now have a terminal tied to your project with its own history file.
-
----
+5. **For bash shells:**
+   - Custom initialization runs from **.vscode/.bashrc**
+   - Shell history is saved in **.vscode/.bash_history**
 
 ## 🔧 Requirements
 

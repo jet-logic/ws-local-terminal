@@ -2,7 +2,7 @@
   "name": "workspace-local-terminal",
   "displayName": "Workspace Local Terminal",
   "description": "Sets up a workspace local terminal with a shared history file.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "repository": "https://github.com/jet-logic/ws-local-terminal",
   "engines": {
     "vscode": "^1.50.0"
