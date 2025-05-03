@@ -5,8 +5,12 @@ import * as child_process from "child_process";
 
 function checkShellAvailability(shell: string): boolean {
   try {
-    // Check if shell exists by running the command with --version flag
-    child_process.execSync(`${shell} --version`, { stdio: "ignore" });
+    // Special check for PowerShell
+    if (shell.toLowerCase() === "powershell") {
+      child_process.execSync("pwsh --version", { stdio: "ignore" });
+    } else {
+      child_process.execSync(`${shell} --version`, { stdio: "ignore" });
+    }
     return true;
   } catch (error) {
     return false;
@@ -14,7 +18,6 @@ function checkShellAvailability(shell: string): boolean {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-
   const disposable = vscode.commands.registerCommand(
     "workspaceLocalTerminal.setup",
     async () => {
@@ -32,19 +35,23 @@ export function activate(context: vscode.ExtensionContext) {
         fs.mkdirSync(vscodeDir);
       }
 
-      // Shell options with availability check
-      const shellOptions = ["Bash", "Zsh", "Fish"];
-      const availableShells = shellOptions.filter((shell) =>
-        checkShellAvailability(shell.toLowerCase())
-      );
+      // Updated shell options with PowerShell
+      const shellOptions = ["Bash", "Zsh", "Fish", "PowerShell"];
+      const availableShells = shellOptions.filter((shell) => {
+        const shellName = shell.toLowerCase();
+        if (shellName === "powershell") {
+          return checkShellAvailability("pwsh") || checkShellAvailability("powershell");
+        }
+        return checkShellAvailability(shellName);
+      });
 
       if (availableShells.length === 0) {
         vscode.window.showErrorMessage(
-          "No available shells (Bash, Zsh, or Fish) found on your system."
+          "No available shells (Bash, Zsh, Fish, or PowerShell) found on your system."
         );
         return;
       }
-      // If only one shell is available, skip the selection prompt
+
       const selectedShell =
         availableShells.length === 1
           ? availableShells[0]
@@ -57,13 +64,15 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      // Capitalize profileName
       const profileName = `${selectedShell.toLowerCase()}-ws-local`;
 
       // Generate shell config based on selection
       let shellConfig = "";
       let historyFile = "";
       let rcFile = "";
+      let shellPath = "";
+      let shellArgs: string[] = [];
+
       switch (selectedShell) {
         case "Zsh":
           rcFile = ".zshrc";
@@ -77,7 +86,10 @@ autoload -Uz add-zsh-hook
 add-zsh-hook precmd history -a
 echo "Workspace Local Terminal"
         `.trim();
+          shellPath = "/bin/zsh";
+          shellArgs = ["--rcfile", `\${workspaceFolder}/.vscode/${rcFile}`];
           break;
+
         case "Fish":
           rcFile = "config.fish";
           historyFile = `fish_history`;
@@ -87,7 +99,33 @@ set -g history_size 10000
 set -g history_file "$PWD/.vscode/${historyFile}"
 echo "Workspace Local Terminal" "$HISTFILE"
         `.trim();
+          shellPath = "/usr/bin/fish";
+          shellArgs = [
+            "--init-command",
+            "set -gx fish_history $PWD/.vscode/" + historyFile,
+          ];
           break;
+
+        case "PowerShell":
+          rcFile = "profile.ps1";
+          historyFile = `powershell_history`;
+          shellConfig = `
+# Load user's profile if it exists
+if (Test-Path -Path $PROFILE) { . $PROFILE }
+# Set workspace-specific history
+Set-PSReadLineOption -HistorySavePath "$PWD\\.vscode\\${historyFile}"
+Set-PSReadLineOption -MaximumHistoryCount 10000
+Write-Host "Workspace Local PowerShell Terminal"
+`.trim();
+          // Try pwsh first, fall back to powershell
+          shellPath = checkShellAvailability("pwsh") ? "pwsh" : "powershell";
+          shellArgs = [
+            "-NoExit",
+            "-Command",
+            `Set-PSReadLineOption -HistorySavePath "$PWD\\.vscode\\${historyFile}"`,
+          ];
+          break;
+
         default: // Bash
           rcFile = ".bashrc";
           historyFile = `.bash_history`;
@@ -100,6 +138,8 @@ HISTCONTROL=ignoreboth
 trap 'history -a' EXIT
 echo "Workspace Local Terminal" "$HISTFILE"
         `.trim();
+          shellPath = "/bin/bash";
+          shellArgs = ["--rcfile", `\${workspaceFolder}/.vscode/${rcFile}`];
           break;
       }
 
@@ -119,22 +159,23 @@ echo "Workspace Local Terminal" "$HISTFILE"
         settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
       }
 
+      // Windows/Linux/macOS profile configuration
+      const profilesKey = process.platform === "win32"
+        ? "terminal.integrated.profiles.windows"
+        : "terminal.integrated.profiles.linux";
+
       settings = {
         ...settings,
-        "terminal.integrated.profiles.linux": {
-          ...(settings["terminal.integrated.profiles.linux"] || {}),
+        [profilesKey]: {
+          ...(settings[profilesKey] || {}),
           [profileName]: {
-            path: selectedShell === "Fish" ? "/usr/bin/fish" : "/bin/bash",
-            args:
-              selectedShell === "Fish"
-                ? [
-                  "--init-command",
-                  "set -gx fish_history $PWD/.vscode/" + historyFile,
-                ]
-                : ["--rcfile", `\${workspaceFolder}/.vscode/${rcFile}`],
+            path: shellPath,
+            args: shellArgs,
           },
         },
         "terminal.integrated.defaultProfile.linux": profileName,
+        "terminal.integrated.defaultProfile.windows": profileName,
+        "terminal.integrated.defaultProfile.osx": profileName,
       };
 
       fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
